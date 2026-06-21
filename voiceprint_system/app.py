@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import json
 import shutil
@@ -11,6 +12,9 @@ import streamlit as st
 # 路径与配置初始化
 # ==============================================================================
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 MEETINGS_DIR = os.path.join(PROJECT_ROOT, "meetings")
 DB_DIR = os.path.join(PROJECT_ROOT, "voiceprint_system", "database")
 UNKNOWN_DIR = os.path.join(DB_DIR, "_unknown")
