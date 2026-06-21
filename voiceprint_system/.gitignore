@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# 忽略临时与生成的音频文件
+*.wav
+*.mp3
+*.m4a
+
+# 忽略转写输出结果
+*_transcript.md
+*_transcript.json
+temp_normalized_input.wav
+temp_normalized.wav
+
+# 忽略本地声纹数据库中的具体向量数据（保障隐私与项目整洁）
+database/*/

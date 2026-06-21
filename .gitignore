@@ -169,3 +169,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Local Meeting Transcription & Voiceprint outputs
+meetings/
+*.mp3
+*.wav
+*.m4a
+*.flac
