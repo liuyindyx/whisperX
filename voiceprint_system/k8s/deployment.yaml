@@ -1,0 +1,86 @@
+# ==============================================================================
+# 🎙️ WhisperX Voiceprint System - Kubernetes Deployment 部署配置
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisperx-voiceprint
+  namespace: default
+  labels:
+    app: whisperx-voiceprint
+spec:
+  replicas: 1  # 大模型转写任务占用较多资源，默认单实例部署，支持 PVC ReadWriteOnce
+  selector:
+    matchLabels:
+      app: whisperx-voiceprint
+  template:
+    metadata:
+      labels:
+        app: whisperx-voiceprint
+    spec:
+      containers:
+        - name: app
+          image: whisperx-voiceprint:latest  # 请替换为您在私有仓库/本地镜像库中的镜像路径
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          
+          # 环境变量配置
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: whisperx-config
+                  key: PORT
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: whisperx-secrets
+                  key: DEEPSEEK_API_KEY
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: whisperx-secrets
+                  key: GOOGLE_API_KEY
+                  
+          # 资源配额限制 (由于运行多声纹与ASR模型，推荐配置较大 CPU 与内存)
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2000m"
+            limits:
+              memory: "8Gi"
+              cpu: "4000m"
+              
+          # 健康检查探针
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            
+          # 挂载卷绑定
+          volumeMounts:
+            - name: whisperx-storage
+              mountPath: /app/meetings
+              subPath: meetings
+            - name: whisperx-storage
+              mountPath: /app/voiceprint_system/database
+              subPath: database
+            - name: whisperx-storage
+              mountPath: /app/cache
+              subPath: cache
+              
+      volumes:
+        - name: whisperx-storage
+          persistentVolumeClaim:
+            claimName: whisperx-storage-pvc

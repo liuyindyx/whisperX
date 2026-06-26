@@ -1,0 +1,20 @@
+# ==============================================================================
+# 🎙️ WhisperX Voiceprint System - Kubernetes Service 暴露配置
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisperx-voiceprint-service
+  namespace: default
+  labels:
+    app: whisperx-voiceprint
+spec:
+  type: NodePort  # 在本地或云端测试环境使用 NodePort 以直接通过主机 IP + 端口访问，也可变更为 ClusterIP 或 LoadBalancer
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080  # 绑定 Node 端口 30080，方便外部浏览器访问 http://<node-ip>:30080
+      name: http
+  selector:
+    app: whisperx-voiceprint

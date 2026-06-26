@@ -496,7 +496,7 @@ st.sidebar.markdown("---")
 
 panel = st.sidebar.radio(
     "功能控制中心",
-    ["🚀 任务启动与跟踪", "👥 声纹标定中心"],
+    ["🚀 任务启动与跟踪", "👥 声纹标定中心", "⚙️ AI总结设置"],
     index=0
 )
 
@@ -557,6 +557,16 @@ if panel == "🚀 任务启动与跟踪":
             if use_num_speakers:
                 num_speakers = st.number_input("发言人总数", min_value=1, max_value=20, value=2, step=1)
                 
+        # 提示总结大模型
+        from voiceprint_system.src.summary import load_config
+        cfg = load_config()
+        prov = cfg.get("provider", "ollama")
+        if prov == "ollama":
+            model_info = f"Ollama ({cfg.get('ollama_model', 'gemma4:12b-32k')})"
+        else:
+            model_info = "DeepSeek API" if prov == "deepseek" else "Gemini API"
+        st.caption(f"ℹ️ **当前配置的纪要总结模型**: `{model_info}` (可在左侧侧边栏切换)")
+
         # 启动转写按钮
         if is_running:
             st.button("🚀 转译任务正在后台进行...", disabled=True)
@@ -753,18 +763,45 @@ if panel == "🚀 任务启动与跟踪":
                     # ==========================================
                     # AI 总结后端触发按钮
                     # ==========================================
+                    # 创建两个在按钮下方、横跨整张卡片宽度的占位符，用来渲染流式生成进度和打字机效果
+                    status_container = st.empty()
+                    progress_container = st.empty()
+                    
                     with btn_cols[2]:
                         sum_btn_label = "🔄 重新生成总结" if item['has_summary'] else "🤖 生成 AI 总结"
+                        
+                        # 获取当前模型信息以展示友好提示
+                        from voiceprint_system.src.summary import load_config
+                        cfg = load_config()
+                        prov = cfg.get("provider", "ollama")
+                        if prov == "ollama":
+                            model_info = f"Ollama: {cfg.get('ollama_model', 'gemma4:12b-32k')}"
+                        elif prov == "deepseek":
+                            model_info = "DeepSeek API"
+                        elif prov == "gemini":
+                            model_info = "Gemini API"
+                        else:
+                            model_info = "未配置"
+                            
+                        st.caption(f"当前配置模型: `{model_info}`")
+                        
                         if st.button(sum_btn_label, key=f"btn_ai_sum_{item['name']}"):
-                            with st.spinner("🤖 正在调用 AI 大模型生成深度会议总结，请稍候..."):
-                                try:
-                                    from voiceprint_system.src.summary import generate_summary_document
-                                    generate_summary_document(item['dir'])
-                                    st.success("🎉 会议总结已成功生成并写入 summary.md！")
-                                    time.sleep(1)
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"生成总结失败: {e}")
+                            status_container.markdown(f"🤖 **正在调用 {model_info} 实时进行长文本会议总结...**")
+                            progress_container.markdown("")
+                            try:
+                                from voiceprint_system.src.summary import generate_summary_document_stream
+                                full_text = ""
+                                for chunk in generate_summary_document_stream(item['dir']):
+                                    full_text += chunk
+                                    # 使用光标符号模拟打字机动态效果
+                                    progress_container.markdown(full_text + "▌")
+                                    
+                                progress_container.markdown(full_text)
+                                status_container.success("🎉 会议总结已成功生成并写入 summary.md！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                status_container.error(f"生成总结失败: {e}")
                     st.write("")
 
 # ==============================================================================
@@ -889,3 +926,90 @@ elif panel == "👥 声纹标定中心":
                             time.sleep(1)
                             st.rerun()
                     st.markdown("---")
+
+# ==============================================================================
+# Panel C: AI总结设置
+# ==============================================================================
+elif panel == "⚙️ AI总结设置":
+    st.markdown("<h1>⚙️ AI 会议总结服务配置</h1>", unsafe_allow_html=True)
+    
+    from voiceprint_system.src.summary import load_config, CONFIG_PATH
+    config = load_config()
+    
+    st.markdown("""
+    <div class="stCard">
+        <h3>🤖 总结模型与服务配置</h3>
+        <p>在此配置生成会议纪要与深度总结时使用的大模型。推荐使用本地 <b>Ollama</b> 服务以保护隐私并实现完全本地化运行。</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 映射英文 Key 变更为中文显示
+    provider_options = {
+        "ollama": "Ollama (本地运行大模型) [推荐]",
+        "deepseek": "DeepSeek Chat API (云端)",
+        "gemini": "Google Gemini API (云端)"
+    }
+    # 反向映射
+    provider_rev = {v: k for k, v in provider_options.items()}
+    
+    current_provider = config.get("provider", "ollama")
+    default_index = list(provider_options.keys()).index(current_provider) if current_provider in provider_options else 0
+    
+    selected_provider_label = st.selectbox(
+        "选择大模型服务商:",
+        list(provider_options.values()),
+        index=default_index
+    )
+    selected_provider = provider_rev[selected_provider_label]
+    
+    # 根据选择展示对应的配置框
+    new_config = config.copy()
+    new_config["provider"] = selected_provider
+    
+    st.markdown("---")
+    
+    if selected_provider == "ollama":
+        st.info("💡 **提示**: 使用 Ollama 前，请确保已在终端启动 `ollama serve` 并拉取了对应模型（如 `gemma4:12b-32k` 或您本地运行的其它模型）。")
+        col_host, col_model = st.columns([1, 1])
+        with col_host:
+            new_config["ollama_host"] = st.text_input(
+                "Ollama 服务接口地址 (Host):",
+                value=config.get("ollama_host", "http://localhost:11434")
+            )
+        with col_model:
+            new_config["ollama_model"] = st.text_input(
+                "运行模型名称 (Model Name):",
+                value=config.get("ollama_model", "gemma4:12b-32k"),
+                help="对应 ollama run 后的模型名字，例如 gemma4:12b-32k, gemma2:9b 等"
+            )
+            
+    elif selected_provider == "deepseek":
+        new_config["deepseek_api_key"] = st.text_input(
+            "DeepSeek API Key:",
+            value=config.get("deepseek_api_key", ""),
+            type="password",
+            help="输入您的 DeepSeek API 密钥"
+        )
+        
+    elif selected_provider == "gemini":
+        new_config["google_api_key"] = st.text_input(
+            "Google Gemini API Key:",
+            value=config.get("google_api_key", ""),
+            type="password",
+            help="输入您的 Google Gemini API 密钥"
+        )
+        
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    
+    save_col, _ = st.columns([2, 8])
+    with save_col:
+        if st.button("💾 保存系统配置", use_container_width=True):
+            try:
+                with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                    json.dump(new_config, f, ensure_ascii=False, indent=2)
+                st.success("🎉 配置已成功持久化保存！下一次生成纪要将立即使用新配置。")
+                time.sleep(1)
+                st.rerun()
+            except Exception as e:
+                st.error(f"保存配置失败: {e}")
+

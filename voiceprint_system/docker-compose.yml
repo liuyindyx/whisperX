@@ -1,0 +1,24 @@
+# ==============================================================================
+# 🎙️ WhisperX Voiceprint System - Docker Compose 配置
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: voiceprint_system/Dockerfile
+    container_name: whisperx-voiceprint-app
+    ports:
+      - "8000:8000"
+    volumes:
+      # 挂载宿主机目录实现转译结果、声纹特征数据库及大模型缓存在宿主机的持久化保存与实时同步
+      - ../meetings:/app/meetings
+      - ../voiceprint_system/database:/app/voiceprint_system/database
+      - ../cache:/app/cache
+    environment:
+      # 传递环境变量给容器（可选，用于 AI 总结）
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    restart: always

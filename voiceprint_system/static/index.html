@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎙️ 声纹会议转译管理系统</title>
+    <!-- 引入高质感 Google 字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+    <!-- 1. 全局登录面板 -->
+    <div id="login-container" class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-icon"><i class="fa-solid fa-microphone-lines animate-pulse"></i></div>
+                <h2>声纹会议转译系统</h2>
+                <p>请输入管理员身份凭证进入控制台</p>
+            </div>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username"><i class="fa-solid fa-user"></i> 用户名</label>
+                    <input type="text" id="username" placeholder="请输入用户名" required autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <label for="password"><i class="fa-solid fa-lock"></i> 密码</label>
+                    <input type="password" id="password" placeholder="请输入密码" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-primary btn-block" id="login-btn">
+                    <span>登 录</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+            <div id="login-error" class="alert-error hidden"></div>
+        </div>
+    </div>
+
+    <!-- 2. 全局主系统容器 -->
+    <div id="app-container" class="app-wrapper hidden">
+        
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i class="fa-solid fa-microphone-lines brand-icon"></i>
+                <div class="brand-text">
+                    <h3>会议声纹转译</h3>
+                    <span>Console v1.0</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" data-tab="transcribe-panel">
+                    <i class="fa-solid fa-circle-play"></i>
+                    <span>任务启动与历史</span>
+                </a>
+                <a href="#" class="menu-item" data-tab="speakers-panel" id="menu-speakers">
+                    <i class="fa-solid fa-users-gear"></i>
+                    <span>声纹标定管理</span>
+                </a>
+                <a href="#" class="menu-item" data-tab="config-panel">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>系统参数配置</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-stats">
+                <div class="stat-divider"></div>
+                <div class="stat-title">数据库状态</div>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <span class="stat-value" id="stats-named">0</span>
+                        <span class="stat-label">已标定人数</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stats-unknown">0</span>
+                        <span class="stat-label">待标定声纹</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <i class="fa-solid fa-circle-user user-avatar"></i>
+                    <span id="current-username">Admin</span>
+                </div>
+                <button id="logout-btn" title="安全登出"><i class="fa-solid fa-right-from-bracket"></i></button>
+            </div>
+        </aside>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            
+            <!-- A. 任务启动与历史面板 -->
+            <section id="transcribe-panel" class="tab-panel active">
+                <div class="panel-header">
+                    <h2>🚀 任务启动与跟踪中心</h2>
+                    <p>上传会议音频、配置ASR参数，并异步追踪转译结果与 AI 纪要</p>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- 左侧：新建任务 -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-folder-plus text-primary"></i> 启动全新转译任务</h3>
+                        </div>
+                        <div class="card-body">
+                            <!-- 上传音频组件 -->
+                            <div class="upload-zone" id="upload-zone">
+                                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                                <p class="upload-main-text">拖拽会议录音到此处，或 <span>浏览文件</span></p>
+                                <p class="upload-sub-text">支持格式: .mp3, .wav, .m4a, .flac (最大 200MB)</p>
+                                <input type="file" id="audio-file-input" class="hidden" accept=".mp3,.wav,.m4a,.flac">
+                            </div>
+                            <div id="upload-progress-container" class="upload-progress-box hidden">
+                                <div class="progress-info">
+                                    <span id="upload-filename">meeting.mp3</span>
+                                    <span id="upload-percent">0%</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div id="upload-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- 选择已有文件 & ASR 配置表单 -->
+                            <form id="transcribe-form" class="mt-4">
+                                <div class="form-group">
+                                    <label for="select-audio-file">选择待处理的会议音频：</label>
+                                    <select id="select-audio-file" required>
+                                        <option value="" disabled selected>-- 请选择音频文件 --</option>
+                                    </select>
+                                </div>
+
+                                <div class="accordion-config">
+                                    <div class="config-toggle" id="config-toggle">
+                                        <span><i class="fa-solid fa-circle-info"></i> 高级转译参数配置</span>
+                                        <i class="fa-solid fa-chevron-down" id="config-chevron"></i>
+                                    </div>
+                                    <div class="config-content hidden" id="config-content">
+                                        <div class="form-row">
+                                            <div class="form-group col-6">
+                                                <label for="asr-engine">转译引擎 (ASR Engine)</label>
+                                                <select id="asr-engine">
+                                                    <option value="whisperx" selected>WhisperX (包含强制对齐)</option>
+                                                    <option value="whispercpp">Whisper.cpp (轻量加速)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group col-6">
+                                                <label for="cosine-threshold">声纹识别相似度阈值</label>
+                                                <div class="range-container">
+                                                    <input type="range" id="cosine-threshold" min="0.50" max="0.95" step="0.01" value="0.68">
+                                                    <span id="threshold-val">0.68</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group col-12">
+                                                <label class="checkbox-label">
+                                                    <input type="checkbox" id="specify-speakers">
+                                                    <span>指定发言人数量 (精准已知人数时勾选)</span>
+                                                </label>
+                                                <input type="number" id="num-speakers" min="1" max="20" value="2" class="form-control mt-2 hidden" placeholder="请输入发言人人数">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn-primary btn-block mt-4" id="start-transcribe-btn">
+                                    <i class="fa-solid fa-play"></i> <span>开始转译音频</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：实时日志输出 -->
+                    <div class="card glass log-card-height flex-column">
+                        <div class="card-header flex-row flex-between">
+                            <h3><i class="fa-solid fa-terminal text-success"></i> 实时任务转译日志</h3>
+                            <div class="flex-row">
+                                <span id="active-task-name" class="task-badge hidden">无活动任务</span>
+                                <button id="stop-task-btn" class="btn-danger btn-sm hidden"><i class="fa-solid fa-stop"></i> 终止任务</button>
+                            </div>
+                        </div>
+                        <div class="card-body log-console-wrapper flex-grow">
+                            <pre id="log-console" class="log-console">等待转译任务启动...</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 历史转写会议列表 -->
+                <div class="panel-section mt-5">
+                    <div class="section-header">
+                        <h2>📅 历史转译会议列表</h2>
+                        <button class="btn-secondary btn-sm" id="refresh-meetings-btn"><i class="fa-solid fa-rotate"></i> 刷新列表</button>
+                    </div>
+                    
+                    <div class="meetings-grid" id="meetings-list-container">
+                        <!-- 动态载入会议卡片 -->
+                        <div class="no-data-placeholder">
+                            <i class="fa-regular fa-folder-open"></i>
+                            <p>暂无历史会议记录，请在上方启动全新转译任务。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- B. 声纹标定中心面板 -->
+            <section id="speakers-panel" class="tab-panel">
+                <div class="panel-header">
+                    <h2>👥 声纹库与全局发言人标定中心</h2>
+                    <p>管理全局声纹库，注册新声纹，或者将未知声纹合并标定给对应的人员</p>
+                </div>
+
+                <div class="speakers-container-grid">
+                    <!-- 左栏：已标定的声纹数据库 -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-address-book text-primary"></i> 🗄️ 声纹库已命名发言人</h3>
+                        </div>
+                        <div class="card-body scroll-panel-y" id="named-speakers-list">
+                            <!-- 动态加载已命名人员列表 -->
+                            <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 正在加载声纹库...</div>
+                        </div>
+                    </div>
+
+                    <!-- 右栏：全局未知声纹池 -->
+                    <div class="card glass">
+                        <div class="card-header flex-row flex-between">
+                            <h3><i class="fa-solid fa-circle-question text-error"></i> ⏳ 待标定全局声纹池</h3>
+                            <button id="refresh-unknown-btn" class="btn-secondary btn-sm"><i class="fa-solid fa-rotate"></i> 刷新特征</button>
+                        </div>
+                        <div class="card-body scroll-panel-y" id="unknown-speakers-list">
+                            <!-- 动态加载未知声纹列表 -->
+                            <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> 正在获取暂存池...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- C. 系统参数配置面板 -->
+            <section id="config-panel" class="tab-panel">
+                <div class="panel-header">
+                    <h2>⚙️ 系统参数与安全设置</h2>
+                    <p>配置 AI 会议纪要总结模型，以及修改管理员登录账户密码</p>
+                </div>
+
+                <div class="config-grid">
+                    <!-- AI 大模型总结配置 -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-robot text-primary"></i> AI 纪要大模型配置</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="config-form">
+                                <div class="form-group">
+                                    <label for="ai-provider">大模型服务商：</label>
+                                    <select id="ai-provider">
+                                        <option value="ollama">Ollama (本地运行大模型) [隐私推荐]</option>
+                                        <option value="deepseek">DeepSeek Chat API (云端高性能)</option>
+                                        <option value="gemini">Google Gemini API (云端大容量)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Ollama 配置参数 -->
+                                <div id="config-ollama-group" class="config-sub-group">
+                                    <div class="alert-info mb-3">
+                                        <i class="fa-solid fa-info-circle"></i>
+                                        <div>请确保您已在本地运行 <code>ollama serve</code> 并使用命令拉取了对应的总结模型。</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ollama-host">Ollama 服务接口地址 (Host)</label>
+                                        <input type="text" id="ollama-host" placeholder="http://localhost:11434">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ollama-model">运行模型名称 (Model Name)</label>
+                                        <input type="text" id="ollama-model" placeholder="gemma4:12b-32k">
+                                    </div>
+                                </div>
+
+                                <!-- DeepSeek 配置参数 -->
+                                <div id="config-deepseek-group" class="config-sub-group hidden">
+                                    <div class="form-group">
+                                        <label for="deepseek-key">DeepSeek API Key</label>
+                                        <input type="password" id="deepseek-key" placeholder="请输入您的 DeepSeek 密钥">
+                                    </div>
+                                </div>
+
+                                <!-- Gemini 配置参数 -->
+                                <div id="config-gemini-group" class="config-sub-group hidden">
+                                    <div class="form-group">
+                                        <label for="gemini-key">Google Gemini API Key</label>
+                                        <input type="password" id="gemini-key" placeholder="请输入您的 Google API 密钥">
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn-primary mt-4"><i class="fa-solid fa-floppy-disk"></i> 保存系统参数</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- 密码安全设置 -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-shield-halved text-success"></i> 安全认证设置</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="password-form">
+                                <div class="form-group">
+                                    <label for="old-password">当前旧密码</label>
+                                    <input type="password" id="old-password" required placeholder="请输入当前密码">
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-password">设置新密码</label>
+                                    <input type="password" id="new-password" required placeholder="请输入新密码 (最少 6 位)">
+                                </div>
+                                <div class="form-group">
+                                    <label for="confirm-password">确认新密码</label>
+                                    <input type="password" id="confirm-password" required placeholder="请再次输入新密码">
+                                </div>
+
+                                <button type="submit" class="btn-success mt-4"><i class="fa-solid fa-lock-open"></i> 更新管理员密码</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 3. 全局会议详情大弹窗 (Modal) -->
+    <div id="meeting-modal" class="modal-overlay hidden">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <h2 id="modal-meeting-name">会议详情</h2>
+                    <span id="modal-meeting-time">2026-06-26 12:00:00</span>
+                </div>
+                <button class="modal-close" id="modal-close-btn">&times;</button>
+            </div>
+            
+            <div class="modal-body-grid">
+                <!-- 左半部：人名再匹配工具 -->
+                <div class="modal-sidebar">
+                    <div class="sidebar-card-header">
+                        <h4>🗣️ 会议发言人修正</h4>
+                        <p>更正当前会议内匹配错误的发言人名称，将同步更新所有历史文档。</p>
+                    </div>
+                    <div class="speaker-remap-list" id="modal-speaker-remap-container">
+                        <!-- 动态注入发言人再匹配行 -->
+                    </div>
+                </div>
+
+                <!-- 右半部：内容面板（转写 & 纪要总结） -->
+                <div class="modal-main-content">
+                    <div class="modal-tabs">
+                        <button class="modal-tab-btn active" data-content="modal-transcript-tab"><i class="fa-solid fa-align-left"></i> 转译对话文本</button>
+                        <button class="modal-tab-btn" data-content="modal-summary-tab" id="modal-tab-summary"><i class="fa-solid fa-file-invoice"></i> AI 纪要总结</button>
+                    </div>
+                    
+                    <div class="modal-tab-view active" id="modal-transcript-tab">
+                        <!-- Markdown 转写结果展示 -->
+                        <div class="markdown-view" id="modal-transcript-content">
+                            正在加载转译对话...
+                        </div>
+                    </div>
+                    
+                    <div class="modal-tab-view" id="modal-summary-tab">
+                        <!-- AI 总结展示 -->
+                        <div class="flex-row flex-between mb-4">
+                            <span class="text-muted text-sm">点击右侧按钮，让 AI 深入总结本场会议内容：</span>
+                            <button id="modal-regenerate-summary-btn" class="btn-primary btn-sm"><i class="fa-solid fa-wand-magic-sparkles"></i> <span>重新生成 AI 总结</span></button>
+                        </div>
+                        <div class="markdown-view" id="modal-summary-content">
+                            暂无 AI 会议总结。请点击上方按钮自动生成。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全局 Toast 消息容器 -->
+    <div id="toast-container" class="toast-wrapper"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# ==============================================================================
+# 🎙️ WhisperX Voiceprint System - Kubernetes ConfigMap 配置
+# ==============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: whisperx-config
+  namespace: default
+data:
+  # 服务端口与运行参数
+  PORT: "8000"
+  LOG_LEVEL: "info"
